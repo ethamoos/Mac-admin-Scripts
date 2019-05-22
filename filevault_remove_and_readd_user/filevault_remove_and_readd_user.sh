@@ -25,14 +25,23 @@
 # HISTORY
 ####################################################################################
 # Amos Deane July 4 2018
-# v1.1 - fixed buy not applying to correct user - July 5 2018
-# v1.2 - added debut messages
+# v1.1 - fixed bug not applying to correct user - July 5 2018
+# v1.2 - added debug messages
 # v1.3 - updated messages
 # v1.4 - improved formatting
 # v1.5 - updated
 # v1.5.3 - consolidated previous sections into functions
 # v1.5.4 - minor formatting changes
+# v1.5.5 - corrected typos!
+# v1.5.6 - May 21 2019 - added more comments
 
+####################################################################################
+# KNOWN ISSUES 
+####################################################################################
+
+
+
+# array of all users
 allUsers=( `ls /Users/` )
 currentLoggedInUser=$USER
 
@@ -81,6 +90,10 @@ separationLine
 
 echo "NO DEBUG MESSAGES SET"
 }
+####################################################################################	
+
+####################################################################################	
+# debug2
 ####################################################################################	
 
 # function debug2 {
