@@ -10,7 +10,7 @@
 #######################################################################################
 # The purpose of this script is to install a plug-in (e.g. to copy a file or folder from a temp location)
 # but to allow the user to specify the version of the software it is being installed for. 
-# This is for occassions where this will mean that the plug-in should be installed in a different location.
+# This is for occasions where this will mean that the plug-in should be installed in a different location.
 # If the copy completes successfully the script provides options for running additional tasks 
 # for example listing contents or removing the original files being copied
 

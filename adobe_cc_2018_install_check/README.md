@@ -8,3 +8,6 @@
   (this needs to be configured and individual install policies need to be present) 
   
   The script works via the presence of flags, so it can be configured to keep trying at a set interval until it detects all components from Adobe CC present on the device, at which point the flag will be removed and the script will cease to trigger.
+  
+  Known issues:
+  The calculation of the size of the fully installed suite is fairly basic and limited in the scope of what is checked. In practise, I have found that it works reasonably well as if an install fails it usually ommits most of the install files, however it could potentially be unreliable and I am looking at creating a function/some functions to do more accurate install checks.
