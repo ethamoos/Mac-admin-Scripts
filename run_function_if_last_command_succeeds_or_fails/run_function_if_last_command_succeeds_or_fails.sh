@@ -2,6 +2,8 @@
 
 # Amos Deane - 2019
 # v1 - May 23 2019
+# v1.2 - Aug 14 2019 
+# Fixed bug because of absence of: checkForLastCommandSuccess
 ####################################################################################
 # NOTES
 ####################################################################################
@@ -62,6 +64,27 @@ function runIfLastCommandSucceeded {
 	fi
 	
 	}
+	
+	
+########################################################################################	
+# checkForLastCommandSuccess ###########################################################
+########################################################################################	
+
+trap 'previous_command=$this_command; this_command=$BASH_COMMAND' DEBUG
+
+function checkForLastCommandSuccess {	
+	if [ $? != 0 ]; then
+	# IF PREVIOUS COMMAND ERRORED THEN PRINT THIS MESSAGE
+	echo "--------------------------------------------------------------------------------"
+	echo "PREVIOUS COMMAND:$previous_command FAILED ********************************************************"
+	else
+	# ELSE PRINT THIS MESSAGE
+	echo "--------------------------------------------------------------------------------"
+	echo "$previous_command COMMAND COMPLETED"
+	fi
+	}
+	
+	
 	
 	
 ########################################################################################	
