@@ -1,5 +1,6 @@
 The purpose of this script is to be able to check the usage of packages across all policies on the JSS
-and to determine which are used the most/least. The method for doing this is, admittedly somewhat "Heath Robinson" and requires multiple stages for parsing the data.
+and to determine which are used the most/least. The method for doing this queries the JSS via the web api,
+downloads the data as XML, and then processes the data parsing it and converting it into a text format.
 
 Below is a summary of the process:
 The script downloads a list of all policy ids
