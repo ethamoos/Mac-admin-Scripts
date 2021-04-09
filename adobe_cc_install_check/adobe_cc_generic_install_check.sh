@@ -3,7 +3,8 @@
 # 
 # 2018 Amos Deane
 # 
-# NOTES
+# NOTES:
+
 # This is a script to make sure that all the components of Adobe CC have installed correctly.
 #  
 # This will do the following:
@@ -11,18 +12,31 @@
 # Checks components: (e.g. that files are physically there?
 # Checks size of the overall install - if it finds applications missing it will trigger a re-install via jamf pro
 # Checks for crash logs, to ascertain if they are crashing on launch -  if so, triggers a re-install for that module.
-# 
-# (this needs to be configured and individual install policies need to be present) 
+# (Note: this needs to be configured and individual install policies need to be present in Jamf) 
 # The script works via the presence of flags, so it can be configured to keep trying at a 
 # set interval until it detects all components from Adobe CC present on the device, at which 
 # point the flag will be removed and the script will cease to trigger.
 #
+#########################################################################################
+# Current method of usage via Jamf Pro
+#########################################################################################
+
+# 1 Install Adobe CC - at the end of the install deposit a flag to indicate that Adobe CC (version) has been installed
+# 2 Create extension attribute in jamf pro to check for presence of flag
+# 3 Create a smart group based on the EA for machines that have the flag present
+# 4 Create policy to run the install checker - this should be scoped to the smart group
+# This can be run more or less regularly as required - an example is doing a check every day or every week
+#
+# If the script runs correctly the flag will be removed
+# The policy should then update inventory so that any changes are recorded in jamf pro
+# The machine will drop out of the smart group and the script will no longer run
+#
+#########################################################################################
 # Known issues:
+#########################################################################################
 # The calculation of the size of the fully installed suite is fairly basic and limited in 
 # the scope of what is checked. In practise, I have found that it works reasonably well as 
-# if an install fails it usually ommits most of the install files, however it could potentially 
-# be unreliable and I am looking at creating a function/some functions to do more accurate install checks.
-
+# if an install fails it usually ommits most of the install files, so there is an obvious size difference. However it could potentially be unreliable and I am looking at creating a function/some functions to do more accurate install checks.
 
 # v1.1 - Feb 8 2018
 # v1.2 - Feb 26 2018
@@ -33,21 +47,38 @@
 # v1.7 - "" corrected formatting
 # v1.8 - "" added additional comments
 # v1.9 - added more history etc
+# v1.10 - updated for CC 2020
+# v1.10.2 - 23 Jul 2020
+# v1.11 - beta
+# v1.12 - added check for login 
+# v1.13 - made generic
+# v1.14 - tidied up
+# v1.15 - 8 Apr 2021 - re-organised so all configuration is in obvious areas
 
-version=v1.9
 
+version=v1.15
 dateTime=$(date "+%d-%m-%Y_%H-%M")
-localLog=/usr/local/scripts/Adobe/CC_2018_INSTALL_CHECK_LOG.txt
 
-########################################################################################
-### FUNCTIONS ##########################################################################
-########################################################################################
+#########################################################################################
+# Editable parameters
+#########################################################################################
 
+adobeVersion=2020
+localLog=/usr/local/scripts/Adobe/CC_${adobeVersion}_INSTALL_CHECK_LOG.txt
+estimatedSize=73000000
+#########################################################################################
+# Note: THIS IS AN APPROXIMATE FIGURE FOR THE TOTAL SIZE OF THE ADOBE INSTALL - Adjust as prefered
+#########################################################################################
+
+#########################################################################################
+### FUNCTIONS ###########################################################################
+#########################################################################################
 
 #########################################################################################
 # checkForLogin
 #########################################################################################
 
+# This is an option to ensure that an install check doesn't take place whilst a user is logged in
 # DISABLE THIS FUNCTION IF TESTING WHILST LOGGED IN
 function checkForLogin {
 currentUser=$(ls -l /dev/console | awk '{print $3}')
@@ -59,7 +90,7 @@ currentUser=$(ls -l /dev/console | awk '{print $3}')
 		fi
 		}
 		
-########################################################################################
+#########################################################################################
 # adobeApplicationCheck
 #########################################################################################
 
@@ -79,11 +110,9 @@ function adobeApplicationCheck {
 		fi
 		}
 
-
-########################################################################################
+#########################################################################################
 # checkForSuccess
 #########################################################################################
-
 
 function checkForSuccess {
 	if [ $? != 0 ]; then
@@ -97,10 +126,9 @@ function checkForSuccess {
 	fi
 	}
 
-########################################################################################
+#########################################################################################
 # getAdobeAppVersion
 #########################################################################################
-
 
 function getAdobeAppVersion {
 appManagerVersion=$( /usr/libexec/plistbuddy -c Print:CFBundleShortVersionString: /Applications/Utilities/Adobe\ Application\ Manager/core/Adobe\ Application\ Manager.app/Contents/Info.plist )
@@ -109,8 +137,7 @@ echo "--------------------------------------------------------------------------
 echo "********** ADOBE APPLICATION MANAGER VERSION IS:$appManagerVersion ***********************"
 }
 
-
-########################################################################################
+#########################################################################################
 # multiplejamf
 #########################################################################################
 
@@ -150,11 +177,9 @@ echo "$1 ALREADY EXISTS - PROCEEDING"
 fi
 }
 
-
 #########################################################################################
 # CHECK FILE EXISTS
 #########################################################################################
-
 
 function checkFileExists () {
 if [ ! -d $1 ]
@@ -168,11 +193,9 @@ echo "$1 ALREADY EXISTS - PROCEEDING"
 fi
 }
 
-
-########################################################################################
+#########################################################################################
 # PROCEED IF FILE EXISTS
 #########################################################################################
-
 
 function proceedIfFileExists () {
 if [ ! -d $1 ]
@@ -187,7 +210,7 @@ exit 0
 fi
 }
 
-########################################################################################
+#########################################################################################
 # ADD ADOBE COMPONENTS
 #########################################################################################
 
@@ -202,7 +225,7 @@ AdobeApps=(`ls /Applications/ | grep Adobe`)
 		for item in "${AdobeApps[@]}" ; do
 		echo "-----------------------------------------------------------------------------"
 		echo "CURRENT ITEM IS:$item"
-		filesize=$(sudo du -s /Applications/"$item" | awk '{print $1}')
+		filesize=$(du -s /Applications/"$item" | awk '{print $1}')
 		echo "-----------------------------------------------------------------------------"
 		printf "$item \nSIZE IS: $filesize\n"
 		let total+=$filesize
@@ -211,9 +234,7 @@ AdobeApps=(`ls /Applications/ | grep Adobe`)
 		echo "-----------------------------------------------------------------------------"
 		printf "ADOBE TOTAL INSTALL SIZE IS: \n$total bytes\n"
 		## This then outputs the totalled variable of all the Adobe components
-
 }
-
 
 ########################################################################################
 # SCRIPT PROGRESS
@@ -221,11 +242,11 @@ AdobeApps=(`ls /Applications/ | grep Adobe`)
 
 checkFolderExists /usr/local/scripts/Adobe
 		
-checkFileExists /usr/local/scripts/Adobe/CC_2018_INSTALL_CHECK_LOG.txt		
+checkFileExists /usr/local/scripts/Adobe/CC_{$adobeVersion}_INSTALL_CHECK_LOG.txt		
 		
-checkForLogin
+# checkForLogin
 
-proceedIfFileExists /usr/local/scripts/Adobe/CC_2018_INSTALLED.txt
+proceedIfFileExists /usr/local/scripts/Adobe/CC_{$adobeVersion}_INSTALLED.txt
 
 ########################################################################################
 ############ REINSTALL POLICIES ########################################################
@@ -234,105 +255,107 @@ proceedIfFileExists /usr/local/scripts/Adobe/CC_2018_INSTALLED.txt
 echo "-----------------------------------------------------------------------------"
 echo "SCRIPT VERSION IS:$version"
 
+########################################################################################
 # To run the application check configure as follows:
+########################################################################################
 # adobeApplicationCheck "Name of application folder" jssCustomTrigger
 # 
+########################################################################################
+############ CONFIGURE HERE ############################################################
+########################################################################################
+
 # NOTE:
 # THE CUSTOM INSTALL TRIGGERS BELOW ARE EXAMPLES - YOU WILL NEED TO ADD YOUR OWN!
 
 getAdobeAppVersion
 
-adobeApplicationCheck "Adobe Acrobat DC" cc2018acrobat
+adobeApplicationCheck "Adobe Acrobat DC" ccExampleTrigger{$adobeVersion}_acrobat
 checkForSuccess
 
-adobeApplicationCheck "Adobe After Effects CC 2018" cc2018_aftereffects
+adobeApplicationCheck "Adobe After Effects $adobeVersion" ccExampleTrigger{$adobeVersion}_aftereffects
 checkForSuccess
 
-adobeApplicationCheck "Adobe Audition CC 2018" cc2018_audition
+adobeApplicationCheck "Adobe Audition $adobeVersion" ccExampleTrigger{$adobeVersion}_audition
 checkForSuccess
 
-adobeApplicationCheck "Adobe Animate CC 2018" cc2018_animate
+adobeApplicationCheck "Adobe Animate CC $adobeVersion" ccExampleTrigger{$adobeVersion}_animate
 checkForSuccess
 
-adobeApplicationCheck "Adobe Bridge CC 2018" cc2018_bridge
+adobeApplicationCheck "Adobe Bridge $adobeVersion" ccExampleTrigger{$adobeVersion}_bridge
 checkForSuccess
 
-adobeApplicationCheck "Adobe Character Animator CC 2018" cc2018_characteranimator
+adobeApplicationCheck "Adobe Character Animator $adobeVersion" ccExampleTrigger{$adobeVersion}_characteranimator
 checkForSuccess
 
-adobeApplicationCheck "Adobe Dreamweaver CC 2018" cc2018_dreamweaver
+adobeApplicationCheck "Adobe Dreamweaver $adobeVersion" ccExampleTrigger{$adobeVersion}_dreamweaver
 checkForSuccess
 
-adobeApplicationCheck "Adobe ExtendScript Toolkit CC" CC2015_extendscript
+adobeApplicationCheck "Adobe Dimension CC" ccExampleTrigger{$adobeVersion}_dimension
 checkForSuccess
 
-adobeApplicationCheck "Adobe Extension Manager CC" adobeextensionmanager
+adobeApplicationCheck "Adobe Illustrator $adobeVersion" ccExampleTrigger{$adobeVersion}_illustrator
 checkForSuccess
 
-adobeApplicationCheck "Adobe Fireworks CS6" cc2015_fireworks
+adobeApplicationCheck "Adobe InCopy $adobeVersion" ccExampleTrigger{$adobeVersion}_incopy
 checkForSuccess
 
-adobeApplicationCheck "Adobe Flash Builder 4.7" cc2015_flashbuilder
+adobeApplicationCheck "Adobe InDesign $adobeVersion" ccExampleTrigger{$adobeVersion}_indesign
 checkForSuccess
 
-adobeApplicationCheck "Adobe Gaming SDK 1.4" cc2015_gamingsdk
+adobeApplicationCheck "Adobe Lightroom CC" ccExampleTrigger{$adobeVersion}_lightroom
 checkForSuccess
 
-adobeApplicationCheck "Adobe InDesign CC 2018" cc2018_indesign
+adobeApplicationCheck "Adobe Lightroom Classic CC" ccExampleTrigger{$adobeVersion}_lightroomclassic
 checkForSuccess
 
-adobeApplicationCheck "Adobe Illustrator CC 2018" cc2018_illustrator
+adobeApplicationCheck "Adobe Media Encoder CC $adobeVersion" ccExampleTrigger{$adobeVersion}_mediaencoder
 checkForSuccess
 
-adobeApplicationCheck "Adobe Lightroom Classic CC" cc2018_lightroom
+adobeApplicationCheck "Adobe Prelude CC $adobeVersion" ccExampleTrigger{$adobeVersion}_prelude
 checkForSuccess
 
-adobeApplicationCheck "Adobe Media Encoder CC 2018" cc2018_mediaencoder
+adobeApplicationCheck "Adobe Photoshop CC $adobeVersion" ccExampleTrigger{$adobeVersion}_photoshop
 checkForSuccess
 
-adobeApplicationCheck "Adobe Muse CC 2018" cc2018_muse
+adobeApplicationCheck "Adobe Premiere Pro CC $adobeVersion" ccExampleTrigger{$adobeVersion}_premiere
 checkForSuccess
 
-adobeApplicationCheck "Adobe Prelude CC" cc2018_prelude
+adobeApplicationCheck "Adobe Premiere Rush CC" ccExampleTrigger{$adobeVersion}_premiererush
 checkForSuccess
 
-adobeApplicationCheck "Adobe Photoshop CC 2018" cc2018_photoshop
+adobeApplicationCheck "Adobe XD" ccExampleTrigger{$adobeVersion}_xd
 checkForSuccess
 
-adobeApplicationCheck "Adobe Premiere Pro CC 2018" cc2018_premiere
-checkForSuccess
+########################################################################################
+############ END CONFIGURE HERE ########################################################
+########################################################################################
 
-adobeApplicationCheck "Adobe Scout 2018" adobecc_scout
-checkForSuccess
-
-adobeApplicationCheck "Adobe SpeedGrade 2018" cc2018_speedgrade
-checkForSuccess
 
 echo "-----------------------------------------------------------------------------"
-echo "Adobe CC 2018 CHECK RUN:$dateTime *******************************************" >> $localLog
+echo "Adobe CC {$adobeVersion} CHECK RUN:$dateTime *******************************************" >> $localLog
 echo "-----------------------------------------------------------------------------"
 
-####################################################################################
+########################################################################################
 ## SECTION TO CHECK SIZE OF CURRENT INSTALL
-####################################################################################
+########################################################################################
 
 echo "*****************************************************************************"
 echo "*****************************************************************************"
 echo "-----------------------------------------------------------------------------"
 
-####################################################################################
-## GET SIZE SECTION ################################################################
-####################################################################################
+########################################################################################
+## GET SIZE SECTION ####################################################################
+########################################################################################
 
-# Run adobeAdd function
+# Run adobeAdd function - to calculate total size of adobe install
 
 adobeAdd
 
 echo "-----------------------------------------------------------------------------"
 
-####################################################################################
-### DEBUG SECTION ##################################################################
-####################################################################################
+########################################################################################
+### DEBUG SECTION ######################################################################
+########################################################################################
 # Enable this function to output additional trace messages checking variables
 # 
 # function deBug {
@@ -349,13 +372,13 @@ echo "--------------------------------------------------------------------------
 # echo "-----------------------------------------------------------------------------"
 # unset IFS
 # }
-# deBug ############################################################################
+# deBug ################################################################################
 
 
-####################################################################################
-## CHECK SIZE ######################################################################
-## write size to temp file
-####################################################################################
+########################################################################################
+## CHECK SIZE ##########################################################################
+########################################################################################
+# write size to temp file
 
 adobeTotalSize=/usr/local/scripts/Adobe/adobeTotalSize.txt
 sudo chmod -Rf 777 /usr/local/scripts/Adobe
@@ -368,48 +391,40 @@ echo "--------------------------------------------------------------------------
 echo `cat $adobeTotalSize | awk '{print $1}'` / 1024^2 | bc -l
 # note:	bc is a calculator
 echo "-----------------------------------------------------------------------------"
-####################################################################################
-estimatedSize=73000000
-####################################################################################
-# THIS IS AN APPROXIMATE FIGURE FOR THE TOTAL SIZE OF THE ADOBE INSTALL
-####################################################################################
-
+########################################################################################
 
 if [ $total -lt $estimatedSize ]
 then
 echo "THE ADOBE TOTAL SIZE IS:$total"
 echo "-----------------------------------------------------------------------------"
-echo "THIS IS TOO SMALL - SUSPECT THAT ADOBE CC 2018 IS NOT CORRECTLY INSTALLED - LEAVE FLAG SO RE-RUNS"
+echo "THIS IS TOO SMALL - SUSPECT THAT ADOBE CC {$adobeVersion} IS NOT CORRECTLY INSTALLED - LEAVE FLAG SO RE-RUNS"
 else
 echo "THE ADOBE TOTAL SIZE IS:$total"
 echo "-----------------------------------------------------------------------------"
-echo "THIS IS CORRECT - REMOVING STAGE 1 CC_2018_INSTALLED FLAG"
+echo "THIS IS CORRECT - REMOVING STAGE 1 CC_{$adobeVersion}_INSTALLED FLAG"
 echo "-----------------------------------------------------------------------------"
-sudo rm /usr/local/scripts/Adobe/CC_2018_INSTALLED.txt
-echo "ADDING ADOBE CC 2018 IS INSTALLED FLAG"
-# echo "-----------------------------------------------------------------------------"
-sudo touch /usr/local/scripts/Adobe/CC_2018_CHECK_COMPLETE.txt
+sudo rm /usr/local/scripts/Adobe/CC_{$adobeVersion}_INSTALLED.txt
+echo "ADDING ADOBE CC {$adobeVersion} IS INSTALLED FLAG"
+sudo touch /usr/local/scripts/Adobe/CC_{$adobeVersion}_CHECK_COMPLETE.txt
 fi
 
-
-######### END ######################################################################
+######### END ##########################################################################
 
 echo "-----------------------------------------------------------------------------"
 echo "POLICY HAS COMPLETED"
 echo "-----------------------------------------------------------------------------"
-####################################################################################
-### CLEANUP ########################################################################
-####################################################################################
+########################################################################################
+### CLEANUP ############################################################################
+########################################################################################
 # REMOVE adobeTotalSize.txt TEMP FILE
-####################################################################################
+########################################################################################
 rm $adobeTotalSize
-####################################################################################
+########################################################################################
 echo "-----------------------------------------------------------------------------"
 echo "REMOVING ANY CACHED PACKAGES THAT REMAIN FROM INITIAL INSTALL"
-####################################################################################
-rm -Rf "/Library/Application Support/JAMF/Waiting Room/Adobe_*";
+########################################################################################
+rm -Rf /Library/Application\ Support/JAMF/Waiting\ Room/Adobe*
 checkForSuccess
 echo "-----------------------------------------------------------------------------"
-
 
 exit 0
