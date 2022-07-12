@@ -13,18 +13,28 @@
 # It then parses list of these and downloads their xml files from the JSS
 # The xml files are then parsed for their name and packages 
 # A final list is then output in a text file
+# 
+# Updated Jul 2022 - v.1
 #########################################################################################
 # Variables
 #########################################################################################
 # These are examples and need to be configured
 #########################################################################################
-jssUser=$(cat /Users/$USER/.myuser.txt)
-jssPass=$(cat /Users/$USER/.readinfo.txt)
-# Example config of hard coded values
-# jssHost=https://myJss.myDomain.co.uk:8443/
-jssHost=(cat ~/.myserv.txt)
+# Hard coded values - needs to be configured
+# Adjust address url and port to that of your jss
+jssHost=https://myJss.myDomain.co.uk:8443/
+jssUser=
+jssPass=
+#########################################################################################
+# Using temp files
+#########################################################################################
+# Example - needs to be configured
+#########################################################################################
+# jssUser=$(cat /Users/$USER/.myuser.txt)
+# jssPass=$(cat /Users/$USER/.userinfo.txt)
+# jssHost=(cat ~/.myserv.txt)
+#########################################################################################
 currentUser=$USER
-
 #########################################################################################
 # Objects
 #########################################################################################
