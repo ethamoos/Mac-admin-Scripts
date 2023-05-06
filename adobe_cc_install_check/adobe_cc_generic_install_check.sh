@@ -4,7 +4,7 @@
 # 2018 Amos Deane
 # 
 # NOTES:
-
+# 
 # This is a script to make sure that all the components of Adobe CC have installed correctly.
 #  
 # This will do the following:
@@ -55,9 +55,16 @@
 # v1.14 - tidied up
 # v1.15 - 8 Apr 2021 - re-organised so all configuration is in obvious areas
 # v1.16 - 8 Apr 2021 - added jamf parameters
+# v1.17 - 20 Aug 2021 - added toggle option for check for login 
+# V1.18 - 24 Aug 2021 - added kill option 
+# V1.19 - minor tweak
+# v1.20 - 2 Sep 2021 - added line to fix receipts issue
+# v1.21 - 16 Feb 2022 - updated to fix logging
+# v1.22 - 1 Sep 2022
+# v1.23 - 7 Sep 2022 - fixed issue with Substance Painter
+#########################################################################################
 
-
-version=v1.16
+version=v1.23
 dateTime=$(date "+%d-%m-%Y_%H-%M")
 
 #########################################################################################
@@ -66,17 +73,20 @@ dateTime=$(date "+%d-%m-%Y_%H-%M")
 # Comfigure via Jamf
 #########################################################################################
 
-adobeVersion="$4"
+adbeVersion="$4"
 localLog="$5"
 estimatedSize="$6"
+runIfLoggedIn="$7"
 
 #########################################################################################
 # Comfigure locally
 #########################################################################################
 
-adobeVersion=2020
-localLog=/usr/local/scripts/Adobe/CC_${adobeVersion}_INSTALL_CHECK_LOG.txt
-estimatedSize=73000000
+# adbeVersion=2021
+# localLog=/usr/local/scripts/Adobe/CC_${adbeVersion}_INSTALL_CHECK_LOG.txt
+# estimatedSize=73000000
+# runIfLoggedIn="No"
+
 #########################################################################################
 # Note: THIS IS AN APPROXIMATE FIGURE FOR THE TOTAL SIZE OF THE ADOBE INSTALL - Adjust as prefered
 #########################################################################################
@@ -94,23 +104,29 @@ estimatedSize=73000000
 # This is an option to ensure that an install check doesn't take place whilst a user is logged in
 # DISABLE THIS FUNCTION IF TESTING WHILST LOGGED IN
 function checkForLogin {
+if [ ! -z $runIfLoggedIn ]; then
+echo "checkForLogin is enabled"
 currentUser=$(ls -l /dev/console | awk '{print $3}')
 		if [ $currentUser == root ]; then
 		echo "NOONE IS LOGGED IN"
 		else
 		echo "A USER IS LOGGED IN - ABORTING"
-		exit 0
+		exit 1
 		fi
+else
+echo "checkForLogin is not enabled"
+
+fi		
 		}
 		
 #########################################################################################
-# adobeApplicationCheck
+# adbeApplicationCheck
 #########################################################################################
 
 # The function will check for the existence of the specified app. If it is not found it will 
 # trigger a jamf policy. The app and the policy event can be specified as arguments.
 
-function adobeApplicationCheck {
+function adbeApplicationCheck {
 
 # multiplejamf
 		if [ ! -e "/Applications/$1" ]; then
@@ -140,10 +156,10 @@ function checkForSuccess {
 	}
 
 #########################################################################################
-# getAdobeAppVersion
+# getAdbeAppVersion
 #########################################################################################
 
-function getAdobeAppVersion {
+function getAdbeAppVersion {
 appManagerVersion=$( /usr/libexec/plistbuddy -c Print:CFBundleShortVersionString: /Applications/Utilities/Adobe\ Application\ Manager/core/Adobe\ Application\ Manager.app/Contents/Info.plist )
 
 echo "-----------------------------------------------------------------------------"
@@ -195,7 +211,7 @@ fi
 #########################################################################################
 
 function checkFileExists () {
-if [ ! -d $1 ]
+if [ ! -e $1 ]
 then
 echo "-----------------------------------------------------------------------------"
 echo "$1 DOES NOT EXIST - MAKING"
@@ -211,7 +227,7 @@ fi
 #########################################################################################
 
 function proceedIfFileExists () {
-if [ ! -d $1 ]
+if [ -e $1 ]
 then
 echo "-----------------------------------------------------------------------------"
 echo "$1 EXISTS - PROCEEDING WITH SCRIPT"
@@ -227,7 +243,7 @@ fi
 # ADD ADOBE COMPONENTS
 #########################################################################################
 
-function adobeAdd {
+function countItems {
 # Add all the adobe apps together to get a total size of the install 
 # NOTE: this excludes resource files, so is approximate.
 
@@ -249,17 +265,114 @@ AdobeApps=(`ls /Applications/ | grep Adobe`)
 		## This then outputs the totalled variable of all the Adobe components
 }
 
+
+
+################################################################################
+# checkProcessRunsAndKill
+################################################################################
+
+function checkProcessRunsAndKill () {
+	
+	# Check if process is running and kill if not
+	# v1.4 - added failsafe to bypass in case process argument is ommitted
+	
+	echo "--------------------------------------------------------------------------"
+	echo "Checking for processes"
+	if [ ! -z "$1" ]
+	then
+		
+		if [ ! -z "$2" ]
+		then
+			echo "--------------------------------------------------------------------------"
+			echo "Custom process parameters have been specified:$2"	
+			
+			runningProcesses=(`ps -ax | grep -i "$2" | grep -iv 'jamf' | grep -v 'grep' | grep -v '/usr/local/scripts/Adobe/CC_${adbeVersion}_INSTALL_CHECK_LOG.txt	' | awk '{print $1}'`)
+			runningProcessesName=(`ps -ax | grep -i "$2" | grep -iv 'jamf' | grep -v 'grep'`)	
+			
+		else
+			echo "--------------------------------------------------------------------------"
+			echo "Process parameters have been specified:$1"
+			runningProcesses=(`ps -ax | grep -i "$1" | grep -iv 'jamf' | grep -v 'grep' | awk '{print $1}'`)
+			runningProcessesName=(`ps -ax | grep -i "$1" | grep -iv 'jamf' | grep -v 'grep'`)
+			if [ ! -z "$runningProcesses" ]
+			then
+				echo "--------------------------------------------------------------------------"
+				echo "CHECKING FOR PROCESS:$1"
+				echo "--------------------------------------------------------------------------"
+				echo "PROCESS FOUND - ID VALUE IS/ARE:"
+				echo "--------------------------------------------------------------------------"
+				echo "${runningProcesses[@]}"
+				echo "--------------------------------------------------------------------------"
+				echo "PROCESS FOUND - NAMES ARE:"        
+				echo "--------------------------------------------------------------------------"
+				echo "${runningProcessesName[@]}"
+				echo "--------------------------------------------------------------------------"
+				echo "KILLING PROCESSES"
+				for processID in "${runningProcesses[@]}"
+				do
+					echo "--------------------------------------------------------------------------"
+					echo "KILLING PROCESS: $processID"
+					sudo kill -9 $processID
+				done
+			else
+				echo "--------------------------------------------------------------------------"
+				echo "PROCESS:$1 NOT FOUND"
+				#			DEBUG
+				#			echo "ALL VARIABLE VALUES ARE:${runningProcesses[@]}"
+			fi
+		fi	
+	else
+		
+		echo "--------------------------------------------------------------------------"
+		echo "No process parameters have been specified - ignoring"
+	fi
+	
+}
+
+################################################################################
+# compareTotals
+################################################################################
+
+function compareTotals () {
+	total=$1
+	estimatedSize=$2
+	adbeVersion=$3
+	
+	if [ $total -lt $estimatedSize ]
+	then
+		echo "THE ADOBE TOTAL SIZE IS:$total"
+		echo "-----------------------------------------------------------------------------"
+		echo "THIS IS TOO SMALL - SUSPECT THAT ADOBE CC ${adbeVersion} IS NOT CORRECTLY INSTALLED - LEAVE FLAG SO RE-RUNS"
+	else
+		echo "THE ADOBE TOTAL SIZE IS:$total"
+		echo "-----------------------------------------------------------------------------"
+		echo "THIS IS CORRECT - REMOVING STAGE 1 CC_${adbeVersion}_INSTALLED FLAG"
+		echo "-----------------------------------------------------------------------------"
+		sudo rm /usr/local/scripts/Adobe/CC_${adbeVersion}_INSTALLED.txt
+		echo "ADDING ADOBE CC ${adbeVersion} IS INSTALLED FLAG"
+		# echo "-----------------------------------------------------------------------------"
+		sudo touch /usr/local/scripts/Adobe/CC_${adbeVersion}_CHECK_COMPLETE.txt
+	fi
+}
+
+
 ########################################################################################
 # SCRIPT PROGRESS
 ########################################################################################
 
+# Fix issues with previous install version
+echo "Fixing issue with old receipts"
+rm -Rf /private/var/db/receipts/com.adobe.Enterprise*
+
 checkFolderExists /usr/local/scripts/Adobe
 		
-checkFileExists /usr/local/scripts/Adobe/CC_{$adobeVersion}_INSTALL_CHECK_LOG.txt		
-		
-# checkForLogin
+checkFileExists /usr/local/scripts/Adobe/CC_${adbeVersion}_INSTALL_CHECK_LOG.txt		
 
-proceedIfFileExists /usr/local/scripts/Adobe/CC_{$adobeVersion}_INSTALLED.txt
+sudo chmod -Rf 777 /usr/local/scripts/Adobe
+
+checkForLogin
+
+proceedIfFileExists /usr/local/scripts/Adobe/CC_${adbeVersion}_INSTALLED.txt
 
 ########################################################################################
 ############ REINSTALL POLICIES ########################################################
@@ -267,86 +380,130 @@ proceedIfFileExists /usr/local/scripts/Adobe/CC_{$adobeVersion}_INSTALLED.txt
 
 echo "-----------------------------------------------------------------------------"
 echo "SCRIPT VERSION IS:$version"
-
+echo "Script is running at:$dateTime"
 ########################################################################################
 # To run the application check configure as follows:
 ########################################################################################
-# adobeApplicationCheck "Name of application folder" jssCustomTrigger
+# adbeApplicationCheck "Name of application folder" jssCustomTrigger
 # 
 ########################################################################################
 ############ CONFIGURE HERE ############################################################
 ########################################################################################
 
+
 # NOTE:
 # THE CUSTOM INSTALL TRIGGERS BELOW ARE EXAMPLES - YOU WILL NEED TO ADD YOUR OWN!
 
-getAdobeAppVersion
 
-adobeApplicationCheck "Adobe Acrobat DC" ccExampleTrigger{$adobeVersion}_acrobat
+getAdbeAppVersion | tee -a "$localLog"
+
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Acrobat DC" cc${adbeVersion}_acrobat | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe After Effects $adbeVersion" cc${adbeVersion}_aftereffects | tee -a "$localLog"
 checkForSuccess
 
-adobeApplicationCheck "Adobe After Effects $adobeVersion" ccExampleTrigger{$adobeVersion}_aftereffects
-checkForSuccess
 
-adobeApplicationCheck "Adobe Audition $adobeVersion" ccExampleTrigger{$adobeVersion}_audition
-checkForSuccess
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Audition $adbeVersion" cc${adbeVersion}_audition | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
 
-adobeApplicationCheck "Adobe Animate CC $adobeVersion" ccExampleTrigger{$adobeVersion}_animate
-checkForSuccess
 
-adobeApplicationCheck "Adobe Bridge $adobeVersion" ccExampleTrigger{$adobeVersion}_bridge
-checkForSuccess
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Animate CC $adbeVersion" cc${adbeVersion}_animate | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
 
-adobeApplicationCheck "Adobe Character Animator $adobeVersion" ccExampleTrigger{$adobeVersion}_characteranimator
-checkForSuccess
 
-adobeApplicationCheck "Adobe Dreamweaver $adobeVersion" ccExampleTrigger{$adobeVersion}_dreamweaver
-checkForSuccess
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Bridge $adbeVersion" cc${adbeVersion}_bridge | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
 
-adobeApplicationCheck "Adobe Dimension CC" ccExampleTrigger{$adobeVersion}_dimension
-checkForSuccess
 
-adobeApplicationCheck "Adobe Illustrator $adobeVersion" ccExampleTrigger{$adobeVersion}_illustrator
-checkForSuccess
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Character Animator $adbeVersion" cc${adbeVersion}_characteranimator | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
 
-adobeApplicationCheck "Adobe InCopy $adobeVersion" ccExampleTrigger{$adobeVersion}_incopy
-checkForSuccess
 
-adobeApplicationCheck "Adobe InDesign $adobeVersion" ccExampleTrigger{$adobeVersion}_indesign
-checkForSuccess
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Dreamweaver $adbeVersion" cc${adbeVersion}_dreamweaver | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
 
-adobeApplicationCheck "Adobe Lightroom CC" ccExampleTrigger{$adobeVersion}_lightroom
-checkForSuccess
 
-adobeApplicationCheck "Adobe Lightroom Classic CC" ccExampleTrigger{$adobeVersion}_lightroomclassic
-checkForSuccess
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Dimension CC" cc${adbeVersion}_dimension | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
 
-adobeApplicationCheck "Adobe Media Encoder CC $adobeVersion" ccExampleTrigger{$adobeVersion}_mediaencoder
-checkForSuccess
 
-adobeApplicationCheck "Adobe Prelude CC $adobeVersion" ccExampleTrigger{$adobeVersion}_prelude
-checkForSuccess
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Illustrator $adbeVersion" cc${adbeVersion}_illustrator | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
 
-adobeApplicationCheck "Adobe Photoshop CC $adobeVersion" ccExampleTrigger{$adobeVersion}_photoshop
-checkForSuccess
 
-adobeApplicationCheck "Adobe Premiere Pro CC $adobeVersion" ccExampleTrigger{$adobeVersion}_premiere
-checkForSuccess
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe InCopy $adbeVersion" cc${adbeVersion}_incopy | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
 
-adobeApplicationCheck "Adobe Premiere Rush CC" ccExampleTrigger{$adobeVersion}_premiererush
-checkForSuccess
 
-adobeApplicationCheck "Adobe XD" ccExampleTrigger{$adobeVersion}_xd
-checkForSuccess
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe InDesign $adbeVersion" cc${adbeVersion}_indesign | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Lightroom CC" cc${adbeVersion}_lightroom | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Lightroom Classic CC" cc${adbeVersion}_lightroomclassic | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Media Encoder CC $adbeVersion" cc${adbeVersion}_mediaencoder | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Prelude CC $adbeVersion" cc${adbeVersion}_prelude | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Photoshop CC $adbeVersion" cc${adbeVersion}_photoshop | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Premiere Pro CC $adbeVersion" cc${adbeVersion}_premiere | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Premiere Rush CC" cc${adbeVersion}_premiererush | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe Substance 3D Painter" cc${adbeVersion}_substance | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+
+checkProcessRunsAndKill 'Adobe' 
+adbeApplicationCheck "Adobe XD" cc${adbeVersion}_xd | tee -a "$localLog"
+checkForSuccess | tee -a "$localLog"
+
+echo "Get the latest version of the Adobe Desktop App" | tee -a "$localLog"
+sudo jamf policy -event adobeccapp | tee -a "$localLog"
 
 ########################################################################################
 ############ END CONFIGURE HERE ########################################################
 ########################################################################################
 
 
-echo "-----------------------------------------------------------------------------"
-echo "Adobe CC {$adobeVersion} CHECK RUN:$dateTime *******************************************" >> $localLog
-echo "-----------------------------------------------------------------------------"
 
 ########################################################################################
 ## SECTION TO CHECK SIZE OF CURRENT INSTALL
@@ -362,7 +519,7 @@ echo "--------------------------------------------------------------------------
 
 # Run adobeAdd function - to calculate total size of adobe install
 
-adobeAdd
+countItems
 
 echo "-----------------------------------------------------------------------------"
 
@@ -394,7 +551,6 @@ echo "--------------------------------------------------------------------------
 # write size to temp file
 
 adobeTotalSize=/usr/local/scripts/Adobe/adobeTotalSize.txt
-sudo chmod -Rf 777 /usr/local/scripts/Adobe
 sudo printf $total > $adobeTotalSize
 
 printf "CONVERTING BYTES TO HUMAN READABLE FORMAT:\n"
@@ -406,26 +562,14 @@ echo `cat $adobeTotalSize | awk '{print $1}'` / 1024^2 | bc -l
 echo "-----------------------------------------------------------------------------"
 ########################################################################################
 
-if [ $total -lt $estimatedSize ]
-then
-echo "THE ADOBE TOTAL SIZE IS:$total"
-echo "-----------------------------------------------------------------------------"
-echo "THIS IS TOO SMALL - SUSPECT THAT ADOBE CC {$adobeVersion} IS NOT CORRECTLY INSTALLED - LEAVE FLAG SO RE-RUNS"
-else
-echo "THE ADOBE TOTAL SIZE IS:$total"
-echo "-----------------------------------------------------------------------------"
-echo "THIS IS CORRECT - REMOVING STAGE 1 CC_{$adobeVersion}_INSTALLED FLAG"
-echo "-----------------------------------------------------------------------------"
-sudo rm /usr/local/scripts/Adobe/CC_{$adobeVersion}_INSTALLED.txt
-echo "ADDING ADOBE CC {$adobeVersion} IS INSTALLED FLAG"
-sudo touch /usr/local/scripts/Adobe/CC_{$adobeVersion}_CHECK_COMPLETE.txt
-fi
+compareTotals $total $estimatedSize ${adbeVersion}
+
 
 ######### END ##########################################################################
 
 echo "-----------------------------------------------------------------------------"
 echo "POLICY HAS COMPLETED"
-echo "-----------------------------------------------------------------------------"
+#echo "-----------------------------------------------------------------------------"
 ########################################################################################
 ### CLEANUP ############################################################################
 ########################################################################################
@@ -438,6 +582,8 @@ echo "REMOVING ANY CACHED PACKAGES THAT REMAIN FROM INITIAL INSTALL"
 ########################################################################################
 rm -Rf /Library/Application\ Support/JAMF/Waiting\ Room/Adobe*
 checkForSuccess
+echo "-----------------------------------------------------------------------------"
+echo "Adobe CC ${adbeVersion} Check Completed:$dateTime *******************************************" >> $localLog
 echo "-----------------------------------------------------------------------------"
 
 exit 0
