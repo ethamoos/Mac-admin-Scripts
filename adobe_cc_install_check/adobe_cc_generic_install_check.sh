@@ -1,4 +1,5 @@
 #!/bin/bash
+# 
 # tags: Adobe
 # 
 # 2018 Amos Deane
@@ -20,7 +21,7 @@
 #########################################################################################
 # Current method of usage via Jamf Pro
 #########################################################################################
-
+# 
 # 1 Install Adobe CC - at the end of the install deposit a flag to indicate that Adobe CC (version) has been installed
 # 2 Create extension attribute in jamf pro to check for presence of flag
 # 3 Create a smart group based on the EA for machines that have the flag present
@@ -34,10 +35,11 @@
 #########################################################################################
 # Known issues:
 #########################################################################################
+# 
 # The calculation of the size of the fully installed suite is fairly basic and limited in 
 # the scope of what is checked. In practise, I have found that it works reasonably well as 
 # if an install fails it usually ommits most of the install files, so there is an obvious size difference. However it could potentially be unreliable and I am looking at creating a function/some functions to do more accurate install checks.
-
+# 
 # v1.1 - Feb 8 2018
 # v1.2 - Feb 26 2018
 # v1.3 - correct line 105
@@ -65,6 +67,7 @@
 #########################################################################################
 
 version=v1.23
+
 dateTime=$(date "+%d-%m-%Y_%H-%M")
 
 #########################################################################################
@@ -103,6 +106,7 @@ runIfLoggedIn="$7"
 
 # This is an option to ensure that an install check doesn't take place whilst a user is logged in
 # DISABLE THIS FUNCTION IF TESTING WHILST LOGGED IN
+
 function checkForLogin {
 if [ ! -z $runIfLoggedIn ]; then
 echo "checkForLogin is enabled"
@@ -137,6 +141,7 @@ function adbeApplicationCheck {
 		echo "-----------------------------------------------------------------------------"
 		echo "$1 HAS BEEN INSTALLED ON THIS MACHINE - SKIPPING"
 		fi
+		
 		}
 
 #########################################################################################
@@ -164,6 +169,7 @@ appManagerVersion=$( /usr/libexec/plistbuddy -c Print:CFBundleShortVersionString
 
 echo "-----------------------------------------------------------------------------"
 echo "********** ADOBE APPLICATION MANAGER VERSION IS:$appManagerVersion ***********************"
+
 }
 
 #########################################################################################
@@ -292,8 +298,10 @@ function checkProcessRunsAndKill () {
 		else
 			echo "--------------------------------------------------------------------------"
 			echo "Process parameters have been specified:$1"
+			
 			runningProcesses=(`ps -ax | grep -i "$1" | grep -iv 'jamf' | grep -v 'grep' | awk '{print $1}'`)
 			runningProcessesName=(`ps -ax | grep -i "$1" | grep -iv 'jamf' | grep -v 'grep'`)
+			
 			if [ ! -z "$runningProcesses" ]
 			then
 				echo "--------------------------------------------------------------------------"
@@ -360,7 +368,9 @@ function compareTotals () {
 # SCRIPT PROGRESS
 ########################################################################################
 
+########################################################################################
 # Fix issues with previous install version
+########################################################################################
 echo "Fixing issue with old receipts"
 rm -Rf /private/var/db/receipts/com.adobe.Enterprise*
 
@@ -381,6 +391,7 @@ proceedIfFileExists /usr/local/scripts/Adobe/CC_${adbeVersion}_INSTALLED.txt
 echo "-----------------------------------------------------------------------------"
 echo "SCRIPT VERSION IS:$version"
 echo "Script is running at:$dateTime"
+
 ########################################################################################
 # To run the application check configure as follows:
 ########################################################################################
@@ -391,7 +402,9 @@ echo "Script is running at:$dateTime"
 ########################################################################################
 
 
+########################################################################################
 # NOTE:
+########################################################################################
 # THE CUSTOM INSTALL TRIGGERS BELOW ARE EXAMPLES - YOU WILL NEED TO ADD YOUR OWN!
 
 
@@ -551,6 +564,7 @@ echo "--------------------------------------------------------------------------
 # write size to temp file
 
 adobeTotalSize=/usr/local/scripts/Adobe/adobeTotalSize.txt
+
 sudo printf $total > $adobeTotalSize
 
 printf "CONVERTING BYTES TO HUMAN READABLE FORMAT:\n"
@@ -558,30 +572,37 @@ echo "--------------------------------------------------------------------------
 echo "THIS IS THE GB FORMAT FROM THE TEXT FILE"
 echo "-----------------------------------------------------------------------------"
 echo `cat $adobeTotalSize | awk '{print $1}'` / 1024^2 | bc -l
+
 # note:	bc is a calculator
+
 echo "-----------------------------------------------------------------------------"
+
 ########################################################################################
 
 compareTotals $total $estimatedSize ${adbeVersion}
-
 
 ######### END ##########################################################################
 
 echo "-----------------------------------------------------------------------------"
 echo "POLICY HAS COMPLETED"
-#echo "-----------------------------------------------------------------------------"
+
 ########################################################################################
 ### CLEANUP ############################################################################
 ########################################################################################
 # REMOVE adobeTotalSize.txt TEMP FILE
 ########################################################################################
+
 rm $adobeTotalSize
+
 ########################################################################################
 echo "-----------------------------------------------------------------------------"
 echo "REMOVING ANY CACHED PACKAGES THAT REMAIN FROM INITIAL INSTALL"
 ########################################################################################
+
 rm -Rf /Library/Application\ Support/JAMF/Waiting\ Room/Adobe*
+
 checkForSuccess
+
 echo "-----------------------------------------------------------------------------"
 echo "Adobe CC ${adbeVersion} Check Completed:$dateTime *******************************************" >> $localLog
 echo "-----------------------------------------------------------------------------"
